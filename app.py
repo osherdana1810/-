@@ -9,7 +9,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from core import ai_assistant, ai_extract, db, letters, reminders, storage
+from core import ai_assistant, ai_extract, calendar_export, db, letters, reminders, storage
 from core.warranty import STATUS_EXPIRED, STATUS_SOON, STATUS_UNKNOWN
 
 BASE_DIR = Path(__file__).parent
@@ -237,13 +237,34 @@ def fault_dialog(item: dict) -> None:
 
 
 def product_actions(item: dict, key: str) -> None:
-    """Two buttons under a product card: open details, or report a fault."""
-    c1, c2 = st.columns(2)
+    """Buttons under a product card: details, report a fault, add a reminder to the calendar."""
+    c1, c2, c3 = st.columns(3)
     if c1.button("פרטים", key=f"open_{key}_{item['id']}", use_container_width=True):
         go(VIEW_DETAIL, item["id"])
         st.rerun()
     if c2.button("המוצר התקלקל", key=f"fault_{key}_{item['id']}", use_container_width=True):
         fault_dialog(item)
+
+    end = item.get("end_date")
+    remind_on = calendar_export.reminder_date(end) if end else None
+    if remind_on and remind_on >= date.today():
+        c3.download_button(
+            "הוסף ליומן",
+            calendar_export.build_reminder_ics(item, end),
+            file_name=f"warranty-{item['id']}.ics",
+            mime="text/calendar",
+            key=f"ics_{key}_{item['id']}",
+            use_container_width=True,
+            help="קובץ תזכורת שנפתח ביומן, 30 יום לפני סיום האחריות",
+        )
+    else:
+        c3.button(
+            "הוסף ליומן",
+            key=f"ics_off_{key}_{item['id']}",
+            disabled=True,
+            use_container_width=True,
+            help="אין תאריך סיום, או שתזכורת של 30 יום כבר עברה",
+        )
 
 
 # ---------- screens ----------

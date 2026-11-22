@@ -64,14 +64,32 @@ html, body, .stApp, [class*="css"] {
 h1 { font-weight: 800 !important; font-size: 1.7rem !important; letter-spacing: -0.3px; }
 h2, h3 { font-weight: 700 !important; }
 
-/* top navigation */
-div[data-testid="stSegmentedControl"] { direction: rtl; margin-bottom: 8px; }
+/* top navigation: one line, even on phones */
+div[data-testid="stSegmentedControl"] { direction: rtl; margin: 4px 0 14px; }
+div[data-testid="stSegmentedControl"] > div { width: 100%; display: flex; }
+div[data-testid="stSegmentedControl"] { width: 100%; }
+div[data-testid="stButtonGroup"] { width: 100% !important; display: flex !important; }
+div[data-testid="stButtonGroup"] > div { width: 100%; }
+div[data-testid="stSegmentedControl"] button { flex: 1 1 0; min-width: 0; padding: 8px 6px; }
+div[data-testid="stSegmentedControl"] button p { font-size: .9rem; font-weight: 600; white-space: nowrap; }
+
+/* page header */
+.greet { margin: 4px 0 2px; }
+.greet .hi { font-size: 1.6rem; font-weight: 800; letter-spacing: -.3px; }
+.greet .date { color: var(--muted); font-size: .92rem; margin-top: 2px; }
+
+/* empty state */
+.empty { background: var(--card); border: 2px dashed #CFE7E3; border-radius: 20px;
+  padding: 28px 20px; text-align: center; margin: 12px 0; }
+.empty .icon { font-size: 2.4rem; }
+.empty .t { font-weight: 800; font-size: 1.15rem; margin-top: 6px; }
+.empty .d { color: var(--muted); margin-top: 6px; line-height: 1.6; }
 
 /* hero summary */
 .hero { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff;
   border-radius: 20px; padding: 20px; margin: 4px 0 14px; }
 .hero .label { opacity: .9; font-size: .95rem; }
-.hero .stats { display: flex; gap: 10px; margin-top: 14px; }
+.hero .stats { display: flex !important; flex-direction: row !important; gap: 10px; margin-top: 14px; }
 .hero .stat { flex: 1; background: rgba(255,255,255,.18); border-radius: 14px; padding: 10px 12px; font-size: .85rem; }
 .hero .stat b { display: block; font-size: 1.35rem; font-weight: 800; }
 
@@ -122,7 +140,8 @@ div[data-testid="stSegmentedControl"] { direction: rtl; margin-bottom: 8px; }
 @media (max-width: 480px) {
   .block-container { padding-left: 12px; padding-right: 12px; }
   .tiles { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-  .hero .stats { flex-direction: column; }
+  .hero .stat { padding: 8px 6px; font-size: .75rem; }
+  .hero .stat b { font-size: 1.1rem; }
 }
 </style>
 """
@@ -201,7 +220,13 @@ def page_home(c, lead: int) -> None:
     due = reminders.due_reminders(products, today, lead)
     total_value = sum(p["price"] or 0 for p in enriched)
 
-    st.title("אחריותי")
+    st.markdown(
+        '<div class="greet">'
+        '<div class="hi">שלום 👋</div>'
+        f'<div class="date">{today.strftime("%d/%m/%Y")} · כל האחריות שלכם במקום אחד</div>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
     st.markdown(
         '<div class="hero">'
         '<div class="label">כל האחריות שלך, במקום אחד</div>'
@@ -233,11 +258,18 @@ def page_home(c, lead: int) -> None:
     room = st.selectbox("סינון לפי חדר", ["הכל", *rooms]) if rooms else "הכל"
     shown = [p for p in enriched if room == "הכל" or p.get("room") == room]
     if not shown:
-        st.markdown(
-            '<div class="card"><div class="card-title">עדיין אין מוצרים</div>'
-            '<div class="card-sub">צלמו קבלה או הוסיפו מוצר ידנית כדי להתחיל.</div></div>',
-            unsafe_allow_html=True,
-        )
+        if not enriched:
+            st.markdown(
+                '<div class="empty"><div class="icon">🧾</div>'
+                '<div class="t">עוד אין כאן מוצרים</div>'
+                '<div class="d">צלמו את הקבלה של המוצר הראשון, ואנחנו נמלא את הפרטים בשבילכם.<br>'
+                "כך לא תצטרכו לחפש שוב את תעודת האחריות.</div></div>",
+                unsafe_allow_html=True,
+            )
+            st.button("צילום קבלה ראשון", type="primary", use_container_width=True,
+                      key="empty_cta", on_click=go, args=("הוספה",))
+        else:
+            st.caption("אין מוצרים בחדר הזה.")
     for item in shown:
         if item["id"] in {d["id"] for d in due}:
             continue  # already shown in the alert list above

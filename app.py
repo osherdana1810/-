@@ -211,6 +211,41 @@ def product_card_html(item: dict, today: date) -> str:
     )
 
 
+@st.dialog("המוצר התקלקל?")
+def fault_dialog(item: dict) -> None:
+    """Ask for a short description of the fault and show ready-to-send messages."""
+    pid = item["id"]
+    st.write(f"**{item['name']}**")
+    problem = st.text_area(
+        "מה התקלה? כתבו בקצרה",
+        key=f"problem_{pid}",
+        placeholder="למשל: המכונה לא מסתובבת ומציגה קוד E21",
+        height=90,
+    )
+    sender = st.text_input("השם שלכם (לחתימה)", key=f"sender_{pid}")
+    if not problem.strip():
+        st.info("כתבו משפט אחד על התקלה, ואנחנו נכין לכם הודעה רשמית לשירות הלקוחות.")
+        return
+
+    whatsapp = letters.whatsapp_message(item, problem, sender)
+    subject, body = letters.email_draft(item, problem, sender)
+    st.markdown("#### וואטסאפ")
+    st.code(whatsapp, language=None, wrap_lines=True)
+    st.markdown("#### מייל")
+    st.code(f"נושא: {subject}\n\n{body}", language=None, wrap_lines=True)
+    st.caption("לחצו על סמל ההעתקה בכל תיבה והדביקו בוואטסאפ או במייל. האפליקציה לא שולחת דבר בעצמה.")
+
+
+def product_actions(item: dict, key: str) -> None:
+    """Two buttons under a product card: open details, or report a fault."""
+    c1, c2 = st.columns(2)
+    if c1.button("פרטים", key=f"open_{key}_{item['id']}", use_container_width=True):
+        go(VIEW_DETAIL, item["id"])
+        st.rerun()
+    if c2.button("המוצר התקלקל", key=f"fault_{key}_{item['id']}", use_container_width=True):
+        fault_dialog(item)
+
+
 # ---------- screens ----------
 
 def page_home(c, lead: int) -> None:
@@ -249,9 +284,7 @@ def page_home(c, lead: int) -> None:
         )
         for item in due:
             st.markdown(product_card_html(item, today), unsafe_allow_html=True)
-            if st.button("פרטים", key=f"due_{item['id']}"):
-                go(VIEW_DETAIL, item["id"])
-                st.rerun()
+            product_actions(item, "due")
 
     st.subheader("המוצרים שלי")
     rooms = db.list_rooms(c)
@@ -274,9 +307,7 @@ def page_home(c, lead: int) -> None:
         if item["id"] in {d["id"] for d in due}:
             continue  # already shown in the alert list above
         st.markdown(product_card_html(item, today), unsafe_allow_html=True)
-        if st.button("פרטים", key=f"open_{item['id']}"):
-            go(VIEW_DETAIL, item["id"])
-            st.rerun()
+        product_actions(item, "list")
 
 
 def _save_product(c, fields: dict, document: tuple[str, str, str] | None,
@@ -444,11 +475,10 @@ def page_detail(c) -> None:
                 except Exception as exc:
                     st.error(f"העוזר לא זמין כרגע: {exc}")
 
-    st.subheader("מכתב לשירות")
-    problem = st.text_area("תיאור התקלה", key="problem")
-    sender = st.text_input("השם שלכם (לחתימה)", key="sender")
-    st.caption("זו טיוטה בלבד. העתיקו והדביקו בעצמכם; האפליקציה לא שולחת דבר.")
-    st.code(letters.draft_letter(product, problem, sender), language=None)
+    st.subheader("המוצר התקלקל?")
+    st.caption("כתבו מה התקלה, וקבלו הודעה רשמית מוכנה לוואטסאפ או למייל.")
+    if st.button("הכנת פנייה לשירות", type="primary", use_container_width=True):
+        fault_dialog(item)
 
     st.subheader("פעולות")
     if st.button("מחיקת המוצר"):
